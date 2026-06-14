@@ -1,0 +1,197 @@
+name: linux-x86_64-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag to create or update, for example linux-v0.0.0-20260614"
+        required: true
+        type: string
+      release_name:
+        description: "Release title. Defaults to tag_name when empty."
+        required: false
+        type: string
+      prerelease:
+        description: "Mark the GitHub Release as a pre-release."
+        required: false
+        type: boolean
+        default: true
+      release_notes:
+        description: "Short release notes."
+        required: false
+        type: string
+        default: "Linux x86_64 release build."
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.tag_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and release Linux x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: codex-rs
+    env:
+      TARGET: x86_64-unknown-linux-musl
+      CARGO_PROFILE_RELEASE_LTO: thin
+      AWS_LC_SYS_NO_JITTER_ENTROPY: "1"
+      AWS_LC_SYS_NO_JITTER_ENTROPY_X86_64_UNKNOWN_LINUX_MUSL: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install host dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            libubsan1 \
+            zstd
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@a0b273b48ed29de4470960879e8381ff45632f26 # 1.93.0
+        with:
+          targets: x86_64-unknown-linux-musl
+
+      - name: Use hermetic Cargo home
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_home="${GITHUB_WORKSPACE}/.cargo-home"
+          mkdir -p "${cargo_home}/bin"
+          echo "CARGO_HOME=${cargo_home}" >> "$GITHUB_ENV"
+          echo "${cargo_home}/bin" >> "$GITHUB_PATH"
+          : > "${cargo_home}/config.toml"
+
+      - name: Install Zig
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.14.0
+          use-cache: false
+
+      - name: Install musl build tools
+        shell: bash
+        run: bash "${GITHUB_WORKSPACE}/.github/scripts/install-musl-build-tools.sh"
+
+      - name: Configure rustc UBSan wrapper
+        shell: bash
+        run: |
+          set -euo pipefail
+          ubsan=""
+          if command -v ldconfig >/dev/null 2>&1; then
+            ubsan="$(ldconfig -p | grep -m1 'libubsan\.so\.1' | sed -E 's/.*=> (.*)$/\1/')"
+          fi
+          wrapper="${RUNNER_TEMP}/rustc-ubsan-wrapper"
+          cat > "${wrapper}" <<EOF
+          #!/usr/bin/env bash
+          set -euo pipefail
+          if [[ -n "${ubsan}" ]]; then
+            export LD_PRELOAD="${ubsan}\${LD_PRELOAD:+:\${LD_PRELOAD}}"
+          fi
+          exec "\$1" "\${@:2}"
+          EOF
+          chmod +x "${wrapper}"
+          echo "RUSTC_WRAPPER=${wrapper}" >> "$GITHUB_ENV"
+          echo "RUSTC_WORKSPACE_WRAPPER=" >> "$GITHUB_ENV"
+
+      - name: Clear sanitizer flags
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "RUSTFLAGS=" >> "$GITHUB_ENV"
+          echo "CARGO_ENCODED_RUSTFLAGS=" >> "$GITHUB_ENV"
+          echo "RUSTDOCFLAGS=" >> "$GITHUB_ENV"
+          echo "CARGO_BUILD_RUSTFLAGS=" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS=" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS=" >> "$GITHUB_ENV"
+
+      - name: Configure musl rusty_v8 artifact overrides
+        uses: ./.github/actions/setup-rusty-v8-musl
+        with:
+          target: x86_64-unknown-linux-musl
+
+      - name: Build bwrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --target "$TARGET" --release --timings --bin bwrap
+          bwrap_path="target/${TARGET}/release/bwrap"
+          digest="$(sha256sum "$bwrap_path" | awk '{print $1}')"
+          echo "CODEX_BWRAP_SHA256=${digest}" >> "$GITHUB_ENV"
+
+      - name: Build Codex binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build \
+            --target "$TARGET" \
+            --release \
+            --timings \
+            --bin codex \
+            --bin codex-responses-api-proxy \
+            --bin codex-app-server
+
+      - name: Package release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ inputs.tag_name }}"
+          version="${version#linux-v}"
+          dist="${GITHUB_WORKSPACE}/dist"
+          stage="${RUNNER_TEMP}/codex-linux-x86_64"
+          release_dir="target/${TARGET}/release"
+
+          rm -rf "$dist" "$stage"
+          mkdir -p "$dist" "$stage/codex-resources"
+
+          cp "$release_dir/codex" "$stage/codex"
+          cp "$release_dir/codex-responses-api-proxy" "$stage/codex-responses-api-proxy"
+          cp "$release_dir/codex-app-server" "$stage/codex-app-server"
+          cp "$release_dir/bwrap" "$stage/codex-resources/bwrap"
+          chmod 0755 "$stage/codex" "$stage/codex-responses-api-proxy" "$stage/codex-app-server" "$stage/codex-resources/bwrap"
+
+          tar -C "$stage" -czf "$dist/codex-linux-x86_64-${version}.tar.gz" .
+          tar -C "$stage" -cf - . | zstd -T0 -19 -o "$dist/codex-linux-x86_64-${version}.tar.zst"
+          sha256sum "$dist"/* > "$dist/SHA256SUMS"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: codex-linux-x86_64
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Define release title
+        id: release_title
+        shell: bash
+        env:
+          RELEASE_NAME: ${{ inputs.release_name }}
+          TAG_NAME: ${{ inputs.tag_name }}
+        run: |
+          set -euo pipefail
+          title="${RELEASE_NAME}"
+          if [[ -z "$title" ]]; then
+            title="${TAG_NAME}"
+          fi
+          echo "title=${title}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
+        with:
+          name: ${{ steps.release_title.outputs.title }}
+          tag_name: ${{ inputs.tag_name }}
+          target_commitish: ${{ github.sha }}
+          body: ${{ inputs.release_notes }}
+          files: dist/*
+          overwrite_files: true
+          prerelease: ${{ inputs.prerelease }}

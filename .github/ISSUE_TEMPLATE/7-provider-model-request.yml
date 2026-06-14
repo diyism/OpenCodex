@@ -1,0 +1,94 @@
+name: Provider or Model Request
+description: Request support for a new model provider, model family, or provider-specific feature.
+labels:
+  - enhancement
+  - provider-request
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to request a new provider, model family, or provider-specific capability.
+        Please include official documentation links wherever possible.
+
+  - type: input
+    id: provider
+    attributes:
+      label: Provider name
+      description: Example: NVIDIA NIM, OpenRouter, Groq, Together, Azure AI Foundry.
+    validations:
+      required: true
+
+  - type: input
+    id: model_ids
+    attributes:
+      label: Model ids
+      description: List the exact model ids/slugs you want to use.
+      placeholder: z-ai/glm-5.1, nvidia/llama-..., ...
+    validations:
+      required: true
+
+  - type: input
+    id: docs
+    attributes:
+      label: Official API documentation
+      description: Link to provider docs for auth, models, streaming, tools, or reasoning.
+    validations:
+      required: true
+
+  - type: textarea
+    id: api_shape
+    attributes:
+      label: API shape
+      description: Describe endpoints and compatibility.
+      placeholder: |
+        Base URL:
+        Model list endpoint:
+        Chat endpoint:
+        Responses endpoint, if any:
+        Streaming format:
+    validations:
+      required: true
+
+  - type: textarea
+    id: auth
+    attributes:
+      label: Authentication
+      description: Describe the required auth method without sharing secrets.
+      placeholder: Bearer token in Authorization header, env var name, OAuth, command auth, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: capabilities
+    attributes:
+      label: Capabilities needed
+      description: Tell us which provider features matter for your workflow.
+      placeholder: |
+        Streaming:
+        Tool calls:
+        Reasoning/thinking output:
+        Reasoning controls:
+        Vision:
+        Web search:
+        Image generation:
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Official example request
+      description: Paste a minimal curl or SDK example from the provider docs.
+      render: shell
+
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow
+      description: What do you want Codex to do with this provider/model?
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Include constraints, pricing concerns, latency requirements, or known provider quirks.
