@@ -1,7 +1,12 @@
     $ wget https://github.com/diyism/OpenCodex/releases/download/linux-v0.0.0-20260614/codex.tar.gz
     $ tar xvf codex.tar.gz
     $ NVIDIA_API_KEY="nvapi-..." ./codex -c 'model_provider="nvidia-nim"' -c 'model="z-ai/glm-5.1"'
+    $ NVIDIA_API_KEY="nvapi-..." ./codex -c 'model_provider="nvidia-nim"' -c 'model="deepseek-ai/deepseek-v4-pro"'
+    $ NVIDIA_API_KEY="nvapi-..." ./codex -c 'model_provider="nvidia-nim"' -c 'model="moonshotai/kimi-k2.6,"'
+    $ NVIDIA_API_KEY="nvapi-..." ./codex -c 'model_provider="nvidia-nim"' -c 'model="minimaxai/minimax-m3"'
     $ NVIDIA_API_KEY="nvapi-..." ./codex -c 'model_provider="nvidia-nim"' -c 'model="google/diffusiongemma-26b-a4b-it"'
+
+============================================================
 
 # OpenCodex
 
