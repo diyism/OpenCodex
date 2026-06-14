@@ -1,3 +1,8 @@
+    $ wget https://github.com/diyism/OpenCodex/releases/download/linux-v0.0.0-20260614/codex.tar.gz
+    $ tar xvf codex.tar.gz
+    $ NVIDIA_API_KEY="nvapi-..." ./codex -c 'model_provider="nvidia-nim"' -c 'model="z-ai/glm-5.1"'
+    $ NVIDIA_API_KEY="nvapi-..." ./codex -c 'model_provider="nvidia-nim"' -c 'model="google/diffusiongemma-26b-a4b-it"'
+
 # OpenCodex
 
 OpenCodex is a local-first, community-driven build of the Codex CLI focused on
