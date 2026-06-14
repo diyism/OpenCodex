@@ -6,6 +6,11 @@
     $ NVIDIA_API_KEY="nvapi-..." ./codex -c 'model_provider="nvidia-nim"' -c 'model="minimaxai/minimax-m3"'
     $ NVIDIA_API_KEY="nvapi-..." ./codex -c 'model_provider="nvidia-nim"' -c 'model="google/diffusiongemma-26b-a4b-it"'
 
+    # to install:
+    $ sudo install ./codex /usr/bin/opencodex.bin
+    $ echo 'cd $(pwd);NVIDIA_API_KEY="nvapi-..." opencodex.bin -c '\''model_provider="nvidia-nim"'\'' -c '\''model="z-ai/glm-5.1"'\''' > opencodex.sh
+    $ sudo install ./opencodex.sh /usr/bin/opencodex
+
 ============================================================
 
 # OpenCodex
