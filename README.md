@@ -1,4 +1,5 @@
     # this repo forked from: https://github.com/HackWidMaddy/OpenCodex
+    # in debian linux:
     $ wget https://github.com/diyism/OpenCodex/releases/download/linux-v0.0.0-20260614/codex.tar.gz
     $ tar xvf codex.tar.gz
     $ NVIDIA_API_KEY="nvapi-..." ./codex -c 'model_provider="nvidia-nim"' -c 'model="z-ai/glm-5.1"'
